@@ -3,19 +3,19 @@ import { Transform } from 'class-transformer';
 
 export class CreateUserDto {
   @Transform(({ value }) => value?.trim())
-  @IsEmail({}, { message: 'El email debe ser válido' })
-  @IsNotEmpty({ message: 'El email es requerido' })
+  @IsEmail({}, { message: 'Email must be valid' })
+  @IsNotEmpty({ message: 'Email is required' })
   email: string;
 
-  @IsString({ message: 'La contraseña debe ser un texto' })
-  @IsNotEmpty({ message: 'La contraseña es requerida' })
-  @MinLength(8, { message: 'La contraseña debe tener al menos 6 caracteres' })
+  @IsString({ message: 'Password must be a string' })
+  @IsNotEmpty({ message: 'Password is required' })
+  @MinLength(8, { message: 'Password must be at least 8 characters' })
   password: string;
 
   @Transform(({ value }) => value?.trim())
-  @IsString({ message: 'El nombre debe ser un texto' })
-  @IsNotEmpty({ message: 'El nombre es requerido' })
-  @MinLength(3, { message: 'El mínimo de caracteres son 6' })
-  @MaxLength(255, { message: 'El máximo de caracteres son 255' })
+  @IsString({ message: 'Name must be a string' })
+  @IsNotEmpty({ message: 'Name is required' })
+  @MinLength(3, { message: 'Name must be at least 3 characters' })
+  @MaxLength(255, { message: 'Name cannot exceed 255 characters' })
   name: string;
 }

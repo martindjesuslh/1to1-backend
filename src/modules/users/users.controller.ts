@@ -10,7 +10,7 @@ export class UsersController {
   @Get('check')
   @HttpCode(HttpStatus.OK)
   async checkUser(@Query('email') email: string) {
-    if (!email) throw new BadRequestException('El email es requerido');
+    if (!email) throw new BadRequestException('Email is required');
 
     const exists = await this._usersService.existingUserByEmail(email);
 
@@ -20,7 +20,7 @@ export class UsersController {
   @Get('profile')
   @HttpCode(HttpStatus.OK)
   async getProfile(@Query() query: GetProfileQuery) {
-    if (!query.id && !query.email) throw new BadRequestException('Se necesita pasar un parámetro');
+    if (!query.id && !query.email) throw new BadRequestException('Either id or email is required');
 
     const user = await this._usersService.findUser(query);
 
@@ -32,6 +32,6 @@ export class UsersController {
   async register(@Body() payload: CreateUserDto) {
     const user = await this._usersService.create(payload);
 
-    return { message: 'Usuario registrado', data: user };
+    return { message: 'User registered successfully', data: user };
   }
 }
