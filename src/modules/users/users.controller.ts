@@ -1,7 +1,13 @@
 import { Controller, Get, Post, Body, HttpCode, HttpStatus, Query, BadRequestException } from '@nestjs/common';
+import { UseGuards } from '@nestjs/common';
+
 import { UsersService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { GetProfileQuery } from './dto/user.query';
+
+import { JwtAuthGuard } from '@modules/auth/guards/jwt-auth.guard';
+import { GetUser } from '@common/decorators/get-user.decorator';
+import { User } from '@database/entities/user.entity';
 
 @Controller('users')
 export class UsersController {
@@ -18,12 +24,8 @@ export class UsersController {
   }
 
   @Get('profile')
-  @HttpCode(HttpStatus.OK)
-  async getProfile(@Query() query: GetProfileQuery) {
-    if (!query.id && !query.email) throw new BadRequestException('Either id or email is required');
-
-    const user = await this._usersService.findUser(query);
-
+  @UseGuards(JwtAuthGuard)
+  async getProfile(@GetUser() user: User) {
     return { data: user };
   }
 
