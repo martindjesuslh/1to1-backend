@@ -5,9 +5,10 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
-import { UsersModule } from '@modules/users/users.module';
 import { User } from '@database/entities/user.entity';
+import { RefreshToken } from '@database/entities/refresh-token.entity';
 
+import { UsersModule } from '@modules/users/users.module';
 import { AuthModule } from '@modules/auth/auth.module';
 
 @Module({
@@ -26,8 +27,8 @@ import { AuthModule } from '@modules/auth/auth.module';
         username: configService.get<string>('DB_USERNAME'),
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_NAME'),
-        entities: [User],
-        synchronize: true, // Solo para desarrollo, cambiar a false en producción
+        entities: [User, RefreshToken],
+        synchronize: true,
         logging: true,
       }),
     }),
