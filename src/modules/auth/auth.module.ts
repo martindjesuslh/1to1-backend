@@ -7,6 +7,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { TokenCleanupService } from './token-cleanup.service';
 import { UsersModule } from '@modules/users/users.module';
 import { RefreshToken } from '@database/entities/refresh-token.entity';
 
@@ -36,7 +37,7 @@ import { parseTimeToSeconds } from '@common/helpers/time.helper';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, TokenCleanupService],
   exports: [AuthService, JwtStrategy, PassportModule],
 })
 export class AuthModule {}

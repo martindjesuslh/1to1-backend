@@ -149,4 +149,16 @@ export class AuthService {
 
     return user;
   }
+
+  async cleanOldRevokedTokens(daysOld: number = 30): Promise<void> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - daysOld);
+
+    const result = await this._refreshTokenRepository.delete({
+      isRevoked: true,
+      createdAt: LessThan(cutoffDate),
+    });
+
+    console.log(`Cleaned ${result.affected || 0} old revoked tokens (older than ${daysOld} days)`);
+  }
 }
