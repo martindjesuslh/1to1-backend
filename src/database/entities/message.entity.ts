@@ -9,7 +9,6 @@ export enum MessageSender {
 
 @Entity('messages')
 @Index(['conversationId', 'createdAt'])
-@Index(['sender'])
 export class Message {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -27,6 +26,7 @@ export class Message {
     enum: MessageSender,
     default: MessageSender.USER,
   })
+  @Index()
   sender: MessageSender;
 
   @Column({ type: 'text' })
