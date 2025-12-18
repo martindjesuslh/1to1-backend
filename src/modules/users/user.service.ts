@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, ConflictException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
@@ -16,49 +16,41 @@ export class UsersService {
     private readonly _userRepository: Repository<User>,
   ) {}
 
-  async findUser(params: FindUserParams): Promise<ReturnUser> {
-    const where = {};
-    for (const key in params) if (params[key]) where[key] = params[key];
+  async create(createUserDto: CreateUserDto): Promise<ReturnUser> {
+    const { email, password, name } = createUserDto;
 
-    if (!Object.keys(where).length) throw new Error('At least one field must be provided for search');
+    const existingUser = await this._userRepository.findOne({ where: { email } });
 
-    const user = await this._userRepository.findOne({ where });
+    if (existingUser) throw new ConflictException('Email already registered');
 
-    if (!user) throw new ConflictException('User not found');
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    const { password: _, ...userWithoutPassword } = user;
+    const user = this._userRepository.create({
+      email,
+      name,
+      password: hashedPassword,
+    });
+
+    const { password: _, ...userWithoutPassword } = await this._userRepository.save(user);
 
     return userWithoutPassword;
   }
 
-  async existingUserByEmail(email: string): Promise<boolean> {
-    const exists = await this.findUser({ email });
-
-    return Boolean(exists);
+  async findByEmail(email: string): Promise<User | null> {
+    return await this._userRepository.findOne({
+      where: { email },
+    });
   }
 
-  async create(createUserDto: CreateUserDto): Promise<ReturnUser> {
-    const { email, password, name } = createUserDto;
+  async findById(id: string): Promise<ReturnUser> {
+    const user = await this._userRepository.findOne({
+      where: { id },
+    });
 
-    const existingUser = await this.existingUserByEmail(email);
+    if (!user) throw new NotFoundException(`User with ID ${id} not found`);
 
-    if (existingUser) throw new ConflictException('Email already registered');
-
-    try {
-      const hashedPassword = await bcrypt.hash(password, 10);
-
-      const user = this._userRepository.create({
-        email,
-        name,
-        password: hashedPassword,
-      });
-
-      const { password: _, ...userWithoutPassword } = await this._userRepository.save(user);
-
-      return userWithoutPassword;
-    } catch (err) {
-      throw new InternalServerErrorException('Error al crear usuario', err.message);
-    }
+    const { password: _, ...userWithoutPassword } = user;
+    return userWithoutPassword;
   }
 
   async validateUser(email: string, password: string): Promise<ReturnUser | null> {

@@ -18,7 +18,7 @@ export class UsersController {
   async checkUser(@Query('email') email: string) {
     if (!email) throw new BadRequestException('Email is required');
 
-    const exists = await this._usersService.existingUserByEmail(email);
+    const exists = await this._usersService.findByEmail(email);
 
     return { exists };
   }

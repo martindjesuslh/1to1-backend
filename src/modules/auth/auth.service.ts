@@ -143,7 +143,7 @@ export class AuthService {
   }
 
   async validateToken(payload: JwtPayload) {
-    const user = await this._userService.findUser({ id: payload.sub });
+    const user = await this._userService.findById(payload.sub);
 
     if (!user) throw new UnauthorizedException('User not found');
 
