@@ -8,6 +8,8 @@ import { AppService } from './app.service';
 
 import { User } from '@database/entities/user.entity';
 import { RefreshToken } from '@database/entities/refresh-token.entity';
+import { Conversation } from '@database/entities/conversation.entity';
+import { Message } from '@database/entities/message.entity';
 
 import { UsersModule } from '@modules/users/users.module';
 import { AuthModule } from '@modules/auth/auth.module';
@@ -18,7 +20,7 @@ import { AuthModule } from '@modules/auth/auth.module';
       isGlobal: true,
       envFilePath: '.env',
     }),
-    ScheduleModule.forRoot(), // ← AGREGAR SOLO ESTO
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -29,7 +31,7 @@ import { AuthModule } from '@modules/auth/auth.module';
         username: configService.get<string>('DB_USERNAME'),
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_NAME'),
-        entities: [User, RefreshToken],
+        entities: [User, RefreshToken, Conversation, Message],
         synchronize: true,
         logging: true,
       }),

@@ -15,7 +15,6 @@ import { Message } from './message.entity';
 
 @Entity('conversations')
 @Index(['userId', 'createdAt'])
-@Index('createdAt')
 export class Conversation {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -40,5 +39,6 @@ export class Conversation {
   createdAt: Date;
 
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamp' })
+  @Index()
   updatedAt: Date;
 }
