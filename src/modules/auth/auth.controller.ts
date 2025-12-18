@@ -13,12 +13,7 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(@Body() payload: LoginDto) {
-    const result = await this._authService.login(payload);
-
-    return {
-      message: 'Login  successful',
-      data: result,
-    };
+    return await this._authService.login(payload);
   }
 
   @Post('refresh')
