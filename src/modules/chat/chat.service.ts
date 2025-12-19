@@ -5,15 +5,19 @@ import { Repository, DataSource } from 'typeorm';
 import { Conversation, ConversationMetadata } from '@database/entities/conversation.entity';
 import { Message, MessageSender } from '@database/entities/message.entity';
 import { SendChatMessageDto } from './dto/send-chat-message.dto';
+import { OpenAIService } from '@modules/openai/openia.service';
 
 @Injectable()
 export class ChatService {
+  private readonly CONTEXT_UPDATE_THRESHOLD = 3;
+
   constructor(
     @InjectRepository(Conversation)
     private readonly conversationRepository: Repository<Conversation>,
     @InjectRepository(Message)
     private readonly messageRepository: Repository<Message>,
     private readonly dataSource: DataSource,
+    private openAIService: OpenAIService,
   ) {}
 
   async sendMessage(userId: string, sendChatMessageDto: SendChatMessageDto) {
@@ -78,7 +82,11 @@ export class ChatService {
     const conversation = await this.findConversationByIdAndUser(conversationId, userId);
 
     const userMessage = await this.createUserMessage(conversationId, content);
-    const botMessage = await this.createBotMessage(conversationId);
+    const botMessage = await this.createBotMessage(
+      conversationId,
+      conversation.context || 'Nueva conversación',
+      content,
+    );
 
     await this.incrementMessageCounter(conversation);
 
@@ -91,9 +99,15 @@ export class ChatService {
     await queryRunner.startTransaction();
 
     try {
-      const conversation = await this.createNewConversation(queryRunner, userId);
+      const title = await this.openAIService.generateConversationTitle(content);
+      const conversation = await this.createNewConversation(queryRunner, userId, title);
       const userMessage = await this.saveUserMessage(queryRunner, conversation.id, content);
-      const botMessage = await this.saveBotMessage(queryRunner, conversation.id);
+      const botMessage = await this.saveBotMessage(
+        queryRunner,
+        conversation.id,
+        conversation.context || 'Nueva conversación',
+        content,
+      );
 
       await queryRunner.commitTransaction();
 
@@ -106,7 +120,7 @@ export class ChatService {
     }
   }
 
-  private async createNewConversation(queryRunner: any, userId: string): Promise<Conversation> {
+  private async createNewConversation(queryRunner: any, userId: string, title: string): Promise<Conversation> {
     const metadata: ConversationMetadata = {
       interests: [],
       offeredProducts: [],
@@ -116,7 +130,7 @@ export class ChatService {
 
     const conversation = queryRunner.manager.create(Conversation, {
       userId,
-      title: 'New Conversation',
+      title,
       context: null,
       metadata,
       messagesSinceContextUpdate: 2,
@@ -133,8 +147,8 @@ export class ChatService {
     });
   }
 
-  private async createBotMessage(conversationId: string): Promise<Message> {
-    const botResponse = this.generateBotResponse();
+  private async createBotMessage(conversationId: string, context: string, userMessage: string): Promise<Message> {
+    const botResponse = await this.generateBotResponse(context, userMessage);
     return await this.messageRepository.save({
       conversationId,
       content: botResponse,
@@ -151,8 +165,13 @@ export class ChatService {
     return await queryRunner.manager.save(userMessage);
   }
 
-  private async saveBotMessage(queryRunner: any, conversationId: string): Promise<Message> {
-    const botResponse = this.generateBotResponse();
+  private async saveBotMessage(
+    queryRunner: any,
+    conversationId: string,
+    context: string,
+    userMessage: string,
+  ): Promise<Message> {
+    const botResponse = await this.generateBotResponse(context, userMessage);
     const botMessage = queryRunner.manager.create(Message, {
       conversationId,
       content: botResponse,
@@ -161,9 +180,8 @@ export class ChatService {
     return await queryRunner.manager.save(botMessage);
   }
 
-  private generateBotResponse(): string {
-    // TODO: Integración con OpenAI
-    return 'Gracias por tu mensaje. Soy tu asistente de ventas.';
+  private async generateBotResponse(context: string, userMessage: string): Promise<string> {
+    return await this.openAIService.generateSalesResponse(context, userMessage);
   }
 
   private async incrementMessageCounter(conversation: Conversation): Promise<void> {
