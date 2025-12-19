@@ -9,7 +9,7 @@ import { OpenAIService } from '@modules/openai/openia.service';
 
 @Injectable()
 export class ChatService {
-  private readonly CONTEXT_UPDATE_THRESHOLD = 3;
+  private readonly CONTEXT_UPDATE_THRESHOLD = 6;
 
   constructor(
     @InjectRepository(Conversation)
@@ -82,13 +82,9 @@ export class ChatService {
     const conversation = await this.findConversationByIdAndUser(conversationId, userId);
 
     const userMessage = await this.createUserMessage(conversationId, content);
-    const botMessage = await this.createBotMessage(
-      conversationId,
-      conversation.context || 'Nueva conversación',
-      content,
-    );
+    const botMessage = await this.createBotMessage(conversationId, content, conversation.metadata);
 
-    await this.incrementMessageCounter(conversation);
+    await this.handleMetadataUpdate(conversation, conversationId);
 
     return this.formatResponse(conversation, userMessage, botMessage);
   }
@@ -102,12 +98,7 @@ export class ChatService {
       const title = await this.openAIService.generateConversationTitle(content);
       const conversation = await this.createNewConversation(queryRunner, userId, title);
       const userMessage = await this.saveUserMessage(queryRunner, conversation.id, content);
-      const botMessage = await this.saveBotMessage(
-        queryRunner,
-        conversation.id,
-        conversation.context || 'Nueva conversación',
-        content,
-      );
+      const botMessage = await this.saveBotMessage(queryRunner, conversation.id, content, null);
 
       await queryRunner.commitTransaction();
 
@@ -131,7 +122,6 @@ export class ChatService {
     const conversation = queryRunner.manager.create(Conversation, {
       userId,
       title,
-      context: null,
       metadata,
       messagesSinceContextUpdate: 2,
     });
@@ -147,8 +137,12 @@ export class ChatService {
     });
   }
 
-  private async createBotMessage(conversationId: string, context: string, userMessage: string): Promise<Message> {
-    const botResponse = await this.generateBotResponse(context, userMessage);
+  private async createBotMessage(
+    conversationId: string,
+    userMessage: string,
+    metadata: ConversationMetadata | null,
+  ): Promise<Message> {
+    const botResponse = await this.openAIService.generateSalesResponse(userMessage, metadata ?? undefined);
     return await this.messageRepository.save({
       conversationId,
       content: botResponse,
@@ -168,10 +162,10 @@ export class ChatService {
   private async saveBotMessage(
     queryRunner: any,
     conversationId: string,
-    context: string,
     userMessage: string,
+    metadata: ConversationMetadata | null,
   ): Promise<Message> {
-    const botResponse = await this.generateBotResponse(context, userMessage);
+    const botResponse = await this.openAIService.generateSalesResponse(userMessage, metadata ?? undefined);
     const botMessage = queryRunner.manager.create(Message, {
       conversationId,
       content: botResponse,
@@ -180,13 +174,66 @@ export class ChatService {
     return await queryRunner.manager.save(botMessage);
   }
 
-  private async generateBotResponse(context: string, userMessage: string): Promise<string> {
-    return await this.openAIService.generateSalesResponse(context, userMessage);
+  private async handleMetadataUpdate(conversation: Conversation, conversationId: string): Promise<void> {
+    const newCounter = conversation.messagesSinceContextUpdate + 2;
+
+    if (newCounter >= this.CONTEXT_UPDATE_THRESHOLD) {
+      await this.updateConversationMetadata(conversation, conversationId);
+      conversation.messagesSinceContextUpdate = 0;
+    } else {
+      conversation.messagesSinceContextUpdate = newCounter;
+    }
+
+    await this.conversationRepository.save(conversation);
   }
 
-  private async incrementMessageCounter(conversation: Conversation): Promise<void> {
-    conversation.messagesSinceContextUpdate += 2;
-    await this.conversationRepository.save(conversation);
+  private async updateConversationMetadata(conversation: Conversation, conversationId: string): Promise<void> {
+    const shouldGenerateInitialMetadata = this.isInitialMetadataGeneration(conversation);
+
+    if (shouldGenerateInitialMetadata) {
+      await this.generateInitialMetadata(conversation, conversationId);
+    } else {
+      await this.updateExistingMetadata(conversation, conversationId);
+    }
+  }
+
+  private isInitialMetadataGeneration(conversation: Conversation): boolean {
+    const hasEmptyMetadata =
+      conversation.metadata.interests.length === 0 &&
+      conversation.metadata.offeredProducts.length === 0 &&
+      !conversation.metadata.lastIntent;
+
+    return hasEmptyMetadata;
+  }
+
+  private async generateInitialMetadata(conversation: Conversation, conversationId: string): Promise<void> {
+    const messages = await this.getMessagesForAnalysis(conversationId, 6);
+    const conversationHistory = this.formatMessagesForAnalysis(messages);
+    const metadata = await this.openAIService.generateInitialMetadata(conversationHistory);
+    conversation.metadata = metadata;
+  }
+
+  private async updateExistingMetadata(conversation: Conversation, conversationId: string): Promise<void> {
+    const messages = await this.getMessagesForAnalysis(conversationId, 4);
+    const recentMessages = this.formatMessagesForAnalysis(messages);
+    const updatedMetadata = await this.openAIService.updateMetadata(recentMessages, conversation.metadata);
+    conversation.metadata = updatedMetadata;
+  }
+
+  private async getMessagesForAnalysis(conversationId: string, limit: number): Promise<Message[]> {
+    return await this.messageRepository.find({
+      where: { conversationId },
+      select: ['content', 'sender'],
+      order: { createdAt: 'DESC' },
+      take: limit,
+    });
+  }
+
+  private formatMessagesForAnalysis(messages: Message[]): string {
+    return messages
+      .reverse()
+      .map(msg => `${msg.sender === MessageSender.USER ? 'Cliente' : 'Vendedor'}: ${msg.content}`)
+      .join('\n');
   }
 
   private formatResponse(conversation: Conversation, userMessage: Message, botMessage: Message) {
