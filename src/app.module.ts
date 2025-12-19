@@ -13,6 +13,7 @@ import { Message } from '@database/entities/message.entity';
 
 import { UsersModule } from '@modules/users/users.module';
 import { AuthModule } from '@modules/auth/auth.module';
+import { ChatModule } from '@modules/chat/chat.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { AuthModule } from '@modules/auth/auth.module';
     }),
     UsersModule,
     AuthModule,
+    ChatModule,
   ],
   controllers: [AppController],
   providers: [AppService],
