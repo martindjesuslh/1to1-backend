@@ -1,9 +1,9 @@
-import { IsNotEmpty, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
-export class SendMessageDto {
-  @IsNotEmpty({ message: 'Conversation ID is required' })
+export class SendChatMessageDto {
+  @IsOptional()
   @IsUUID('4', { message: 'Conversation ID must be a valid UUID' })
-  conversationId: string;
+  conversationId?: string;
 
   @IsNotEmpty({ message: 'Content is required' })
   @IsString({ message: 'Content must be a string' })

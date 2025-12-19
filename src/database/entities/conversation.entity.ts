@@ -13,6 +13,14 @@ import {
 import { User } from './user.entity';
 import { Message } from './message.entity';
 
+export interface ConversationMetadata {
+  interests: string[];
+  offeredProducts: string[];
+  rejectedProducts: string[];
+  saleStatus: 'exploring' | 'interested' | 'negotiating' | 'closed' | 'lost';
+  lastIntent?: string;
+}
+
 @Entity('conversations')
 @Index(['userId', 'createdAt'])
 export class Conversation {
@@ -35,8 +43,21 @@ export class Conversation {
   })
   messages: Message[];
 
+  @Column({ type: 'text', nullable: true })
+  context: string;
+
+  @Column({ type: 'jsonb', default: () => "'{}'" })
+  metadata: ConversationMetadata;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;
+
+  @Column({
+    name: 'messages_since_context_update',
+    type: 'smallint',
+    default: 0,
+  })
+  messagesSinceContextUpdate: number;
 
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamp' })
   @Index()

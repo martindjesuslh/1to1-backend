@@ -3,7 +3,6 @@ import { UseGuards } from '@nestjs/common';
 
 import { UsersService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
-import { GetProfileQuery } from './dto/user.query';
 
 import { JwtAuthGuard } from '@modules/auth/guards/jwt-auth.guard';
 import { GetUser } from '@common/decorators/get-user.decorator';
