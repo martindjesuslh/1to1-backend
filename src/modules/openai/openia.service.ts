@@ -24,8 +24,14 @@ export class OpenAIService {
         messages: [
           {
             role: 'system',
-            content:
-              'Genera un título corto y descriptivo (máximo 6 palabras) para una conversación de ventas basado en el primer mensaje del usuario. Solo responde con el título, sin comillas ni puntuación adicional.',
+            content: `Genera un título corto para una conversación de ventas.
+REGLAS:
+- Máximo 6 palabras.
+- Sin signos de exclamación ni interrogación.
+- No usar saludos ni frases genéricas.
+- Prioriza intención de compra o producto.
+- Usa el idioma del mensaje del usuario.
+- Responde únicamente con el título, sin texto adicional.`,
           },
           {
             role: 'user',
@@ -79,15 +85,28 @@ export class OpenAIService {
         messages: [
           {
             role: 'system',
-            content: `Analiza esta conversación de ventas y extrae la información estructurada en formato JSON.
-Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, con esta estructura:
+            content: `Analiza esta conversación de ventas y extrae metadata estructurada.
+Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, con esta estructura exacta:
 {
-  "interests": ["array de intereses del cliente"],
+  "interests": ["intereses claros y cortos"],
   "offeredProducts": ["productos mencionados u ofrecidos"],
   "rejectedProducts": ["productos rechazados"],
   "saleStatus": "exploring|interested|negotiating|closed|lost",
-  "lastIntent": "última intención detectada del cliente"
-}`,
+  "lastIntent": "intención más reciente del cliente"
+}
+REGLAS:
+- Usa minúsculas.
+- Elimina duplicados.
+- interests: solo intereses explícitos o claramente inferidos.
+- offeredProducts: solo productos realmente mencionados.
+- rejectedProducts: solo si el cliente rechaza explícitamente.
+- saleStatus:
+  * pregunta general → exploring
+  * pregunta por precio o características → interested
+  * negociación o cotización → negotiating
+  * confirmación de compra → closed
+  * rechazo claro → lost
+- lastIntent: máximo 6 palabras, intención clara y actual.`,
           },
           {
             role: 'user',
@@ -118,15 +137,28 @@ Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, con esta e
             content: `Actualiza la metadata de esta conversación basándote en los mensajes recientes.
 Metadata actual:
 ${JSON.stringify(currentMetadata, null, 2)}
-
-Responde ÚNICAMENTE con un objeto JSON válido actualizado, sin texto adicional, con esta estructura:
+RESPONDE ÚNICAMENTE con un objeto JSON válido actualizado, sin texto adicional, con esta estructura exacta:
 {
   "interests": ["array actualizado de intereses"],
   "offeredProducts": ["productos ofrecidos actualizados"],
   "rejectedProducts": ["productos rechazados actualizados"],
   "saleStatus": "exploring|interested|negotiating|closed|lost",
   "lastIntent": "última intención detectada"
-}`,
+}
+
+REGLAS DE ACTUALIZACIÓN (OBLIGATORIAS):
+- Normaliza todo a minúsculas y elimina duplicados.
+- interests: agrega solo tags cortos detectados en recentMessages; no borres intereses salvo rechazo explícito.
+- offeredProducts: agrega productos que el agente o el usuario hayan mencionado como opción (si ya estaban, no los dupliques).
+- rejectedProducts: si el usuario dice "no", "no quiero", "me interesa otra cosa", agrega el producto a rejectedProducts y quítalo de offeredProducts.
+- saleStatus: avanza siempre hacia el estado más avanzado detectado (closed > negotiating > interested > exploring). No retroceder.
+  * Si hay palabras tipo "precio", "¿cuánto cuesta?" → al menos "interested".
+  * Si pide cotización, descuento o condiciones de pago → "negotiating".
+  * Si confirma compra ("lo compro", "sí, acepto") → "closed".
+  * Si dice "no me interesa" repetidamente → "lost".
+- lastIntent: debe ser la intención MÁS RECIENTE y concisa (máx. 6 palabras).
+- Responde únicamente el JSON (sin comillas de más, sin code fences, sin texto extra).
+`,
           },
           {
             role: 'user',
@@ -150,12 +182,37 @@ Responde ÚNICAMENTE con un objeto JSON válido actualizado, sin texto adicional
   }
 
   private buildSystemPrompt(metadata?: ConversationMetadata): string {
-    const basePrompt = `Eres un asistente de ventas profesional y amigable. Tu objetivo es:
-- Ayudar al cliente a encontrar el producto perfecto para sus necesidades
-- Hacer preguntas relevantes sobre sus preferencias y requisitos
-- Proporcionar información clara y útil sobre productos
-- Mantener un tono conversacional y profesional
-- Guiar la conversación hacia el cierre de la venta de manera natural`;
+    const basePrompt = `Eres un asesor de ventas digital orientado a conversión.
+REGLAS OBLIGATORIAS:
+- Respuestas claras, directas y comerciales.
+- Máximo 5 líneas o 5 bullets.
+- Prohibido explicaciones largas, teoría o definiciones.
+- Prohibido hablar de tu rol, de ayudar o de ser asistente.
+- No usar introducciones largas ni frases de relleno.
+- No disculpas.
+USO OBLIGATORIO DE CONTEXTO (METADATA):
+- interests: prioriza lo que el cliente ya mostró interés.
+- offeredProducts: NO repitas productos ya ofrecidos.
+- rejectedProducts: NUNCA vuelvas a sugerirlos.
+- saleStatus: define el tipo de respuesta.
+- lastIntent: responde directamente a esa intención.
+COMPORTAMIENTO SEGÚN saleStatus:
+- exploring: hacer máximo 2 preguntas para acotar.
+- interested: proponer 2–3 opciones concretas.
+- negotiating: comparar opciones, precio o beneficios.
+- closed: confirmar siguientes pasos, no seguir vendiendo.
+- lost: ofrecer UNA última alternativa o cierre suave.
+FORMATO:
+- Bullets cortos (≤15 palabras).
+- Información accionable, no descriptiva.
+MODO TEXTO CORTO (OBLIGATORIO):
+Si el usuario dice "mucho texto", "resume", "no se entiende", "algo claro":
+- Máximo 3 bullets.
+- Sin introducción.
+- Solo decisión o filtro.
+CIERRE OBLIGATORIO:
+- Termina SIEMPRE con UNA pregunta concreta que obligue a elegir o confirmar.
+`;
 
     if (!metadata) {
       return basePrompt;
