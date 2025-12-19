@@ -14,13 +14,14 @@ import { User } from './user.entity';
 import { Message } from './message.entity';
 
 export interface ConversationMetadata {
+  context?: string;
+  customerName?: string;
   interests: string[];
   offeredProducts: string[];
   rejectedProducts: string[];
   saleStatus: 'exploring' | 'interested' | 'negotiating' | 'closed' | 'lost';
   lastIntent?: string;
 }
-
 @Entity('conversations')
 @Index(['userId', 'createdAt'])
 export class Conversation {
@@ -42,9 +43,6 @@ export class Conversation {
     cascade: true,
   })
   messages: Message[];
-
-  @Column({ type: 'text', nullable: true })
-  context: string;
 
   @Column({ type: 'jsonb', default: () => "'{}'" })
   metadata: ConversationMetadata;
